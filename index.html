@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cppcheck XML Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<h2>Cppcheck XML Viewer</h2>
+
+<div class="file-input-wrapper">
+  <input type="file" id="fileInput" accept=".xml" />
+  <label for="fileInput" class="file-input-label ripple">
+    Choose XML File
+  </label>
+  <button id="reloadBtn" class="reload-btn" style="display: none;">
+    ↻ Reload
+  </button>
+  <span class="file-name" id="fileName"></span>
+</div>
+
+<div class="card">
+  <div class="input-group">
+    <label for="workspaceRoot" title="Enter the root directory of your workspace. This allows you to click on file paths in the table to open them directly in VS Code.">Workspace Root</label>
+    <input
+      type="text"
+      id="workspaceRoot"
+      placeholder="e.g. C:/projects/myrepo"
+    />
+  </div>
+</div>
+
+<div class="tabs-container">
+  <button class="tab-btn active" data-tab="errors">Errors</button>
+  <button class="tab-btn" data-tab="summary">Summary</button>
+  <button class="tab-btn" data-tab="byLocation">By Location</button>
+</div>
+
+<div id="errorsTab" class="tab-content active">
+<div class="filters-section">
+  <h3>Filters</h3>
+  <div class="filters-row">
+    <div class="filter-item">
+      <label for="guidelineFilter">Guideline</label>
+      <select id="guidelineFilter">
+        <option value="">All</option>
+      </select>
+    </div>
+
+    <div class="filter-item">
+      <label for="locationSearch">Location Search</label>
+      <input
+        type="text"
+        id="locationSearch"
+        placeholder="Type to filter locations..."
+      />
+    </div>
+
+    <div class="filter-item">
+      <label for="locationFilter">Location</label>
+      <select id="locationFilter">
+        <option value="">All</option>
+      </select>
+    </div>
+  </div>
+  <button id="resetFiltersBtn" class="reset-filters-btn">Reset Filters</button>
+</div>
+
+<div id="statsSection">
+  <h3>Error Statistics</h3>
+  <div class="stats-container">
+    <div class="stat-item">
+      <span class="stat-label">Total Errors</span>
+      <span class="stat-value" id="totalCount">0</span>
+    </div>
+    <div id="classificationCounts">
+    </div>
+  </div>
+</div>
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Guideline</th>
+        <th>Classification</th>
+        <th>Message</th>
+        <th>File</th>
+        <th>Line</th>
+        <th>Col</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+</div>
+
+<div id="summaryTab" class="tab-content">
+<div id="summaryStatsSection">
+  <h3>Summary Statistics</h3>
+  <div class="stats-container">
+    <div class="stat-item">
+      <span class="stat-label">Total Errors</span>
+      <span class="stat-value" id="summaryTotalCount">0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Unique Guidelines</span>
+      <span class="stat-value" id="uniqueGuidelinesCount">0</span>
+    </div>
+  </div>
+</div>
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Guideline</th>
+        <th>Classification</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody id="summaryTableBody"></tbody>
+  </table>
+</div>
+</div>
+
+<div id="byLocationTab" class="tab-content">
+<div id="locationStatsSection">
+  <h3>Location Summary Statistics</h3>
+  <div class="stats-container">
+    <div class="stat-item">
+      <span class="stat-label">Total Errors</span>
+      <span class="stat-value" id="locationTotalCount">0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Unique Locations</span>
+      <span class="stat-value" id="uniqueLocationsCount">0</span>
+    </div>
+  </div>
+</div>
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Location</th>
+        <th>Total Errors</th>
+        <th>Unique Errors</th>
+      </tr>
+    </thead>
+    <tbody id="locationSummaryTableBody"></tbody>
+  </table>
+</div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
