@@ -325,7 +325,7 @@ function loadMoreRows() {
     const e = filteredErrors[i];
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><a href="https://la.mathworks.com/help/bugfinder/ref/misracpp2023rule${e.guideline}.html" target="_blank">${e.guideline}</a></td>
+      <td><a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${e.guideline}.html" target="_blank">${e.guideline}</a></td>
       <td>${e.classification}</td>
       <td>${e.msg}</td>
       <td>
