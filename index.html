@@ -27,11 +27,14 @@
 <div class="card">
   <div class="input-group">
     <label for="workspaceRoot" title="Enter the root directory of your workspace. This allows you to click on file paths in the table to open them directly in VS Code.">Workspace Root</label>
-    <input
-      type="text"
-      id="workspaceRoot"
-      placeholder="e.g. C:/projects/myrepo"
-    />
+    <div class="workspace-input-wrapper">
+      <input
+        type="text"
+        id="workspaceRoot"
+        placeholder="e.g. C:/projects/myrepo"
+      />
+      <button type="button" id="browseBtn" class="browse-btn">Browse</button>
+    </div>
   </div>
 </div>
 

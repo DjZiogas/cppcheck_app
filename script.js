@@ -39,6 +39,35 @@ workspaceInput.addEventListener("input", () => {
   localStorage.setItem(WORKSPACE_KEY, workspaceInput.value.trim());
 });
 
+const browseBtn = document.getElementById("browseBtn");
+
+browseBtn.addEventListener("click", async () => {
+  if ('showDirectoryPicker' in window) {
+    try {
+      const directoryHandle = await window.showDirectoryPicker();
+      const dirName = directoryHandle.name;
+      
+      // Prompt user for the full path
+      const fullPath = prompt(
+        `You selected: ${dirName}\n\nEnter the full path to this folder:`,
+        workspaceInput.value || ""
+      );
+      
+      if (fullPath && fullPath.trim()) {
+        workspaceInput.value = fullPath.trim();
+        localStorage.setItem(WORKSPACE_KEY, workspaceInput.value);
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Error selecting directory:', err);
+        alert('Unable to select directory. Please enter the path manually.');
+      }
+    }
+  } else {
+    alert('Folder selection is not supported in this browser. Please enter the path manually.');
+  }
+});
+
 fileInput.addEventListener("change", loadXML);
 guidelineFilter.addEventListener("change", renderTable);
 locationFilter.addEventListener("change", renderTable);
