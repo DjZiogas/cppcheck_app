@@ -325,7 +325,10 @@ function loadMoreRows() {
     const e = filteredErrors[i];
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${e.guideline}.html" target="_blank">${e.guideline}</a></td>
+      <td>${e.guideline}
+      <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${e.guideline}.html" target="_blank">C</a>
+      <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${e.guideline}.html" target="_blank">C++</a>
+      </td>
       <td>${e.classification}</td>
       <td>${e.msg}</td>
       <td>
@@ -408,7 +411,7 @@ function compareGuidelines(a, b) {
 }
 
 function vscodeLink(file, line, column) {
-  if (!file || !line) return "";
+  if (!file) return "";
 
   const root = workspaceInput.value.trim();
   if (!root) return "";
@@ -420,7 +423,7 @@ function vscodeLink(file, line, column) {
     ? normalizedFile
     : `${normalizedRoot}/${normalizedFile}`;
 
-  return `vscode://file/${fullPath}:${line}${column ? ':' + column : ''}`;
+  return `vscode://file/${fullPath}${line ? ':' + line : ''}${column ? ':' + column : ''}`;
 }
 
 function resetFilters() {
@@ -535,7 +538,10 @@ function renderSummaryTable() {
     const data = guidelineData[guideline];
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td><a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${guideline}.html" target="_blank">${guideline}</a></td>
+      <td>${guideline}
+      <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${guideline}.html" target="_blank">C</a>
+      <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${guideline}.html" target="_blank">C++</a>
+      </td>
       <td>${data.classification}</td>
       <td>${data.count}</td>
     `;
@@ -680,8 +686,16 @@ function renderLocationSummaryTable() {
     const row = document.createElement('tr');
     const uniqueErrorCount = stats.uniqueErrors.size;
     
+    const fileLink = vscodeLink(location);
+    
     row.innerHTML = `
-      <td>${location}</td>
+      <td>
+        ${
+          fileLink
+            ? `<a href="${fileLink}">${location}</a>`
+            : location
+        }
+      </td>
       <td>${stats.totalErrors}</td>
       <td>${uniqueErrorCount}</td>
     `;
