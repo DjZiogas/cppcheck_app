@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     header.style.cursor = 'pointer';
     header.style.userSelect = 'none';
     header.addEventListener('click', () => {
-      const columns = ['location', 'totalErrors', 'uniqueErrors'];
+      const columns = ['location', 'totalErrors', 'uniqueErrors', 'mandatory', 'required', 'advisory'];
       sortLocationTable(columns[index]);
     });
   });
@@ -726,7 +726,7 @@ function sortLocationTable(column) {
 }
 
 function updateLocationSortIndicators() {
-  const columns = ['location', 'totalErrors', 'uniqueErrors'];
+  const columns = ['location', 'totalErrors', 'uniqueErrors', 'mandatory', 'required', 'advisory'];
   const locationTableHeaders = document.querySelectorAll('#byLocationTab table thead th');
   
   locationTableHeaders.forEach((header, index) => {
@@ -746,11 +746,24 @@ function renderLocationSummaryTable() {
     if (!locationStats[location]) {
       locationStats[location] = {
         totalErrors: 0,
-        uniqueErrors: new Set()
+        uniqueErrors: new Set(),
+        mandatory: new Set(),
+        required: new Set(),
+        advisory: new Set()
       };
     }
     locationStats[location].totalErrors++;
     locationStats[location].uniqueErrors.add(e.guideline);
+    
+    // Track unique errors by classification
+    const classification = e.classification?.toLowerCase() || '';
+    if (classification === 'mandatory') {
+      locationStats[location].mandatory.add(e.guideline);
+    } else if (classification === 'required') {
+      locationStats[location].required.add(e.guideline);
+    } else if (classification === 'advisory') {
+      locationStats[location].advisory.add(e.guideline);
+    }
   });
   
   // Sort locations
@@ -769,6 +782,15 @@ function renderLocationSummaryTable() {
       } else if (locationSortColumn === 'uniqueErrors') {
         aVal = locationStats[a].uniqueErrors.size;
         bVal = locationStats[b].uniqueErrors.size;
+      } else if (locationSortColumn === 'mandatory') {
+        aVal = locationStats[a].mandatory.size;
+        bVal = locationStats[b].mandatory.size;
+      } else if (locationSortColumn === 'required') {
+        aVal = locationStats[a].required.size;
+        bVal = locationStats[b].required.size;
+      } else if (locationSortColumn === 'advisory') {
+        aVal = locationStats[a].advisory.size;
+        bVal = locationStats[b].advisory.size;
       }
       
       if (aVal < bVal) return locationSortDirection === 'asc' ? -1 : 1;
@@ -792,6 +814,9 @@ function renderLocationSummaryTable() {
     const stats = locationStats[location];
     const row = document.createElement('tr');
     const uniqueErrorCount = stats.uniqueErrors.size;
+    const mandatoryCount = stats.mandatory.size;
+    const requiredCount = stats.required.size;
+    const advisoryCount = stats.advisory.size;
     
     const fileLink = vscodeLink(location);
     
@@ -805,6 +830,9 @@ function renderLocationSummaryTable() {
       </td>
       <td>${stats.totalErrors}</td>
       <td>${uniqueErrorCount}</td>
+      <td>${mandatoryCount > 0 ? mandatoryCount : '-'}</td>
+      <td>${requiredCount > 0 ? requiredCount : '-'}</td>
+      <td>${advisoryCount > 0 ? advisoryCount : '-'}</td>
     `;
     locationSummaryTableBody.appendChild(row);
   });
