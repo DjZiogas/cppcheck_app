@@ -47,25 +47,36 @@
   <div class="filters-row">
     <div class="filter-item">
       <label for="guidelineFilter">Guideline</label>
-      <select id="guidelineFilter">
-        <option value="">All</option>
-      </select>
-    </div>
-
-    <div class="filter-item">
-      <label for="locationSearch">Location Search</label>
-      <input
-        type="text"
-        id="locationSearch"
-        placeholder="Type to filter locations..."
-      />
+      <div class="multiselect-wrapper" id="guidelineFilterWrapper">
+        <div class="multiselect-input-container">
+          <div class="multiselect-selected-chips" id="guidelineSelectedChips"></div>
+          <input
+            type="text"
+            id="guidelineFilterSearch"
+            class="multiselect-search"
+            placeholder="Search guidelines..."
+            autocomplete="off"
+          />
+        </div>
+        <div class="multiselect-dropdown" id="guidelineFilterDropdown"></div>
+      </div>
     </div>
 
     <div class="filter-item">
       <label for="locationFilter">Location</label>
-      <select id="locationFilter">
-        <option value="">All</option>
-      </select>
+      <div class="multiselect-wrapper" id="locationFilterWrapper">
+        <div class="multiselect-input-container">
+          <div class="multiselect-selected-chips" id="locationSelectedChips"></div>
+          <input
+            type="text"
+            id="locationFilterSearch"
+            class="multiselect-search"
+            placeholder="Search locations..."
+            autocomplete="off"
+          />
+        </div>
+        <div class="multiselect-dropdown" id="locationFilterDropdown"></div>
+      </div>
     </div>
   </div>
   <button id="resetFiltersBtn" class="reset-filters-btn">Reset Filters</button>
