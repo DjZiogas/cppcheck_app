@@ -1,9 +1,14 @@
 const fileInput = document.getElementById("fileInput");
 const fileName = document.getElementById("fileName");
-const guidelineFilter = document.getElementById("guidelineFilter");
-const locationFilter = document.getElementById("locationFilter");
+const guidelineFilterSearch = document.getElementById("guidelineFilterSearch");
+const guidelineFilterDropdown = document.getElementById("guidelineFilterDropdown");
+const guidelineSelectedChips = document.getElementById("guidelineSelectedChips");
+const guidelineFilterWrapper = document.getElementById("guidelineFilterWrapper");
+const locationFilterSearch = document.getElementById("locationFilterSearch");
+const locationFilterDropdown = document.getElementById("locationFilterDropdown");
+const locationSelectedChips = document.getElementById("locationSelectedChips");
+const locationFilterWrapper = document.getElementById("locationFilterWrapper");
 const tableBody = document.getElementById("tableBody");
-const locationSearch = document.getElementById("locationSearch");
 const workspaceInput = document.getElementById("workspaceRoot");
 const totalCountElement = document.getElementById("totalCount");
 const classificationCountsElement = document.getElementById("classificationCounts");
@@ -25,13 +30,18 @@ let currentIndex = 0;
 const BATCH_SIZE = 50;
 let isLoading = false;
 let observer = null;
-let locationSearchDebounceTimer = null;
 let sortColumn = null;
 let sortDirection = 'asc';
 let summarySortColumn = null;
 let summarySortDirection = 'asc';
 let locationSortColumn = null;
 let locationSortDirection = 'asc';
+
+// Multiselect state
+let selectedGuidelines = [];
+let selectedLocations = [];
+let allGuidelines = [];
+let allLocationsForMultiselect = [];
 
 workspaceInput.value = localStorage.getItem(WORKSPACE_KEY) || "";
 
@@ -40,9 +50,10 @@ workspaceInput.addEventListener("input", () => {
 });
 
 fileInput.addEventListener("change", loadXML);
-guidelineFilter.addEventListener("change", renderTable);
-locationFilter.addEventListener("change", renderTable);
-locationSearch.addEventListener("input", debounceLocationSearch);
+
+// Initialize multiselect components
+initMultiselect('guideline', guidelineFilterSearch, guidelineFilterDropdown, guidelineSelectedChips, guidelineFilterWrapper);
+initMultiselect('location', locationFilterSearch, locationFilterDropdown, locationSelectedChips, locationFilterWrapper);
 
 resetFiltersBtn.addEventListener("click", resetFilters);
 reloadBtn.addEventListener("click", reloadFile);
@@ -96,21 +107,130 @@ function debounce(func, delay) {
   };
 }
 
-function debounceLocationSearch() {
-  clearTimeout(locationSearchDebounceTimer);
-  locationSearchDebounceTimer = setTimeout(() => {
-    const query = locationSearch.value.toLowerCase().trim();
+
+// Multiselect component initialization
+function initMultiselect(type, searchInput, dropdown, chipsContainer, wrapper) {
+  let searchQuery = '';
+  let isOpen = false;
+  
+  // Search input handler
+  searchInput.addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase().trim();
+    updateMultiselectDropdown(type, searchQuery);
+  });
+  
+  // Toggle dropdown on input focus/click
+  searchInput.addEventListener('focus', () => {
+    isOpen = true;
+    dropdown.classList.add('show');
+    updateMultiselectDropdown(type, searchQuery);
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!wrapper.contains(e.target)) {
+      isOpen = false;
+      dropdown.classList.remove('show');
+    }
+  });
+  
+  // Prevent dropdown from closing when clicking inside
+  dropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+}
+
+function updateMultiselectDropdown(type, searchQuery = '') {
+  const items = type === 'guideline' ? allGuidelines : allLocationsForMultiselect;
+  const selected = type === 'guideline' ? selectedGuidelines : selectedLocations;
+  const dropdown = type === 'guideline' ? guidelineFilterDropdown : locationFilterDropdown;
+  
+  dropdown.innerHTML = '';
+  
+  const filtered = items.filter(item => 
+    item.toLowerCase().includes(searchQuery)
+  );
+  
+  if (filtered.length === 0) {
+    const noResults = document.createElement('div');
+    noResults.className = 'multiselect-option';
+    noResults.textContent = 'No results found';
+    dropdown.appendChild(noResults);
+  } else {
+    filtered.forEach(item => {
+      const option = document.createElement('div');
+      option.className = 'multiselect-option';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = `${type}-${item}`;
+      checkbox.checked = selected.includes(item);
+      checkbox.addEventListener('change', () => {
+        toggleMultiselectItem(type, item);
+      });
+      
+      const label = document.createElement('label');
+      label.className = 'multiselect-option-label';
+      label.htmlFor = `${type}-${item}`;
+      label.textContent = item;
+      label.addEventListener('click', (e) => {
+        e.preventDefault();
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change'));
+      });
+      
+      option.appendChild(checkbox);
+      option.appendChild(label);
+      dropdown.appendChild(option);
+    });
+  }
+}
+
+function toggleMultiselectItem(type, item) {
+  const selected = type === 'guideline' ? selectedGuidelines : selectedLocations;
+  const chipsContainer = type === 'guideline' ? guidelineSelectedChips : locationSelectedChips;
+  const searchInput = type === 'guideline' ? guidelineFilterSearch : locationFilterSearch;
+  
+  const index = selected.indexOf(item);
+  if (index > -1) {
+    selected.splice(index, 1);
+  } else {
+    selected.push(item);
+  }
+  
+  // Clear search input after selection
+  searchInput.value = '';
+  
+  updateMultiselectChips(type);
+  updateMultiselectDropdown(type, '');
+  renderTable();
+}
+
+function updateMultiselectChips(type) {
+  const selected = type === 'guideline' ? selectedGuidelines : selectedLocations;
+  const chipsContainer = type === 'guideline' ? guidelineSelectedChips : locationSelectedChips;
+  
+  chipsContainer.innerHTML = '';
+  
+  selected.forEach(item => {
+    const chip = document.createElement('span');
+    chip.className = 'multiselect-chip';
+    chip.innerHTML = `
+      ${item}
+      <button class="multiselect-chip-remove" data-item="${item}">×</button>
+    `;
     
-    // Filter the location dropdown
-    const filtered = query 
-      ? allLocations.filter(loc => loc.toLowerCase().includes(query))
-      : allLocations;
+    chip.querySelector('.multiselect-chip-remove').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMultiselectItem(type, item);
+    });
     
-    populateSelect(locationFilter, filtered);
-    
-    // Render the table
-    renderTable();
-  }, 300);
+    chipsContainer.appendChild(chip);
+  });
+  
+  // Update dropdown checkboxes
+  const searchInput = type === 'guideline' ? guidelineFilterSearch : locationFilterSearch;
+  updateMultiselectDropdown(type, searchInput.value.toLowerCase().trim());
 }
 
 function loadXML(event) {
@@ -142,9 +262,8 @@ function parseXML(xmlText) {
   const xml = parser.parseFromString(xmlText, "application/xml");
 
   // Store current filter values
-  const savedGuidelineFilter = guidelineFilter.value;
-  const savedLocationFilter = locationFilter.value;
-  const savedLocationSearch = locationSearch.value;
+  const savedGuidelines = [...selectedGuidelines];
+  const savedLocations = [...selectedLocations];
 
   errors = Array.from(xml.getElementsByTagName("error"))
     .filter(err =>
@@ -167,50 +286,33 @@ function parseXML(xmlText) {
   populateFilters();
   
   // Restore filter values if they still exist in the new data
-  if (savedGuidelineFilter && Array.from(guidelineFilter.options).some(opt => opt.value === savedGuidelineFilter)) {
-    guidelineFilter.value = savedGuidelineFilter;
-  }
-  if (savedLocationFilter && Array.from(locationFilter.options).some(opt => opt.value === savedLocationFilter)) {
-    locationFilter.value = savedLocationFilter;
-  }
-  if (savedLocationSearch) {
-    locationSearch.value = savedLocationSearch;
-  }
+  selectedGuidelines = savedGuidelines.filter(g => allGuidelines.includes(g));
+  selectedLocations = savedLocations.filter(l => allLocationsForMultiselect.includes(l));
+  
+  // Update chips and dropdowns
+  updateMultiselectChips('guideline');
+  updateMultiselectChips('location');
+  updateMultiselectDropdown('guideline', guidelineFilterSearch.value.toLowerCase().trim());
+  updateMultiselectDropdown('location', locationFilterSearch.value.toLowerCase().trim());
   
   renderTable();
 }
 
 function populateFilters() {
-  const guidelines = [...new Set(errors.map(e => e.guideline))].sort(compareGuidelines);
-	
-  populateSelect(
-    guidelineFilter,
-    guidelines
-  );
-
+  allGuidelines = [...new Set(errors.map(e => e.guideline))].sort(compareGuidelines);
   allLocations = [...new Set(errors.map(e => e.file))].sort();
+  allLocationsForMultiselect = [...allLocations];
   
-  populateSelect(
-    locationFilter,
-    allLocations
-  );
-}
-
-function populateSelect(select, values) {
-  select.innerHTML = '<option value="">All</option>';
-  values.forEach(val => {
-    const opt = document.createElement("option");
-    opt.value = val;
-    opt.textContent = val;
-    select.appendChild(opt);
-  });
+  // Update multiselect dropdowns
+  updateMultiselectDropdown('guideline', guidelineFilterSearch.value.toLowerCase().trim());
+  updateMultiselectDropdown('location', locationFilterSearch.value.toLowerCase().trim());
+  
+  // Update chips
+  updateMultiselectChips('guideline');
+  updateMultiselectChips('location');
 }
 
 function renderTable() {
-  const gFilter = guidelineFilter.value;
-  const lFilter = locationFilter.value;
-  const searchQuery = locationSearch.value.toLowerCase().trim();
-
   tableBody.innerHTML = "";
 
   // Disconnect previous observer
@@ -218,11 +320,10 @@ function renderTable() {
     observer.disconnect();
   }
 
-  // Filter errors
+  // Filter errors - support multiple selections
   filteredErrors = errors.filter(e =>
-    (!gFilter || e.guideline === gFilter) &&
-    (!lFilter || e.file === lFilter) &&
-    (!searchQuery || e.file.toLowerCase().includes(searchQuery))
+    (selectedGuidelines.length === 0 || selectedGuidelines.includes(e.guideline)) &&
+    (selectedLocations.length === 0 || selectedLocations.includes(e.file))
   );
 
   // Apply sorting if a column is selected
@@ -251,43 +352,39 @@ function renderTable() {
 }
 
 function updateFilterOptions() {
-  const gFilter = guidelineFilter.value;
-  const lFilter = locationFilter.value;
-  const searchQuery = locationSearch.value.toLowerCase().trim();
-
-  // Get available guidelines based on current location and search filters
+  // Get available guidelines based on current location filters
   const availableGuidelines = [...new Set(
     errors
       .filter(e => 
-        (!lFilter || e.file === lFilter) &&
-        (!searchQuery || e.file.toLowerCase().includes(searchQuery))
+        (selectedLocations.length === 0 || selectedLocations.includes(e.file))
       )
       .map(e => e.guideline)
   )].sort(compareGuidelines);
 
-  // Get available locations based on current guideline and search filters
+  // Get available locations based on current guideline filters
   const availableLocations = [...new Set(
     errors
       .filter(e => 
-        (!gFilter || e.guideline === gFilter) &&
-        (!searchQuery || e.file.toLowerCase().includes(searchQuery))
+        (selectedGuidelines.length === 0 || selectedGuidelines.includes(e.guideline))
       )
       .map(e => e.file)
   )].sort();
 
-  // Update guideline dropdown while preserving selection
-  const savedGuideline = guidelineFilter.value;
-  populateSelect(guidelineFilter, availableGuidelines);
-  if (savedGuideline && availableGuidelines.includes(savedGuideline)) {
-    guidelineFilter.value = savedGuideline;
-  }
-
-  // Update location dropdown while preserving selection
-  const savedLocation = locationFilter.value;
-  populateSelect(locationFilter, availableLocations);
-  if (savedLocation && availableLocations.includes(savedLocation)) {
-    locationFilter.value = savedLocation;
-  }
+  // Update multiselect options
+  allGuidelines = availableGuidelines;
+  allLocationsForMultiselect = availableLocations;
+  
+  // Update dropdowns with current search queries
+  updateMultiselectDropdown('guideline', guidelineFilterSearch.value.toLowerCase().trim());
+  updateMultiselectDropdown('location', locationFilterSearch.value.toLowerCase().trim());
+  
+  // Remove selections that are no longer available
+  selectedGuidelines = selectedGuidelines.filter(g => allGuidelines.includes(g));
+  selectedLocations = selectedLocations.filter(l => allLocationsForMultiselect.includes(l));
+  
+  // Update chips
+  updateMultiselectChips('guideline');
+  updateMultiselectChips('location');
 }
 
 function updateStatistics() {
@@ -427,12 +524,22 @@ function vscodeLink(file, line, column) {
 }
 
 function resetFilters() {
-  guidelineFilter.value = "";
-  locationFilter.value = "";
-  locationSearch.value = "";
+  selectedGuidelines = [];
+  selectedLocations = [];
   
-  // Restore all locations to the location filter
-  populateSelect(locationFilter, allLocations);
+  // Restore all options
+  allGuidelines = [...new Set(errors.map(e => e.guideline))].sort(compareGuidelines);
+  allLocationsForMultiselect = [...new Set(errors.map(e => e.file))].sort();
+  
+  // Clear search inputs
+  guidelineFilterSearch.value = "";
+  locationFilterSearch.value = "";
+  
+  // Update chips and dropdowns
+  updateMultiselectChips('guideline');
+  updateMultiselectChips('location');
+  updateMultiselectDropdown('guideline', '');
+  updateMultiselectDropdown('location', '');
   
   // Re-render the table with no filters applied
   renderTable();
