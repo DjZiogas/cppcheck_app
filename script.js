@@ -20,6 +20,10 @@ const uniqueGuidelinesCount = document.getElementById("uniqueGuidelinesCount");
 const locationSummaryTableBody = document.getElementById("locationSummaryTableBody");
 const locationTotalCount = document.getElementById("locationTotalCount");
 const uniqueLocationsCount = document.getElementById("uniqueLocationsCount");
+const violationCombinationsModal = document.getElementById("violationCombinationsModal");
+const modalCloseBtn = document.getElementById("modalCloseBtn");
+const modalFileName = document.getElementById("modalFileName");
+const modalContent = document.getElementById("modalContent");
 const WORKSPACE_KEY = "cppcheckWorkspaceRoot";
 
 let errors = [];
@@ -57,6 +61,21 @@ initMultiselect('location', locationFilterSearch, locationFilterDropdown, locati
 
 resetFiltersBtn.addEventListener("click", resetFilters);
 reloadBtn.addEventListener("click", reloadFile);
+
+// Modal close handlers
+if (modalCloseBtn) {
+  modalCloseBtn.addEventListener("click", () => {
+    violationCombinationsModal.style.display = "none";
+  });
+}
+
+if (violationCombinationsModal) {
+  window.addEventListener("click", (event) => {
+    if (event.target === violationCombinationsModal) {
+      violationCombinationsModal.style.display = "none";
+    }
+  });
+}
 
 // Add sorting functionality to table headers
 document.addEventListener('DOMContentLoaded', () => {
@@ -828,12 +847,72 @@ function renderLocationSummaryTable() {
             : location
         }
       </td>
-      <td>${stats.totalErrors}</td>
+      <td class="total-errors-clickable" data-location="${location}" style="cursor: pointer; color: var(--primary-color); text-decoration: underline;">${stats.totalErrors}</td>
       <td>${uniqueErrorCount}</td>
       <td>${mandatoryCount > 0 ? mandatoryCount : '-'}</td>
       <td>${requiredCount > 0 ? requiredCount : '-'}</td>
       <td>${advisoryCount > 0 ? advisoryCount : '-'}</td>
     `;
     locationSummaryTableBody.appendChild(row);
+    
+    // Add click handler for Total Errors
+    const totalErrorsCell = row.querySelector('.total-errors-clickable');
+    totalErrorsCell.addEventListener('click', () => {
+      showViolationCombinationsModal(location);
+    });
   });
+}
+
+function showViolationCombinationsModal(location) {
+  // Get all errors for this location
+  const locationErrors = errors.filter(e => e.file === location);
+  
+  // Group errors by line number
+  const errorsByLine = {};
+  locationErrors.forEach(error => {
+    const line = error.line || 'unknown';
+    if (!errorsByLine[line]) {
+      errorsByLine[line] = [];
+    }
+    errorsByLine[line].push(error.guideline);
+  });
+  
+  // Filter to only lines with more than one error and create unique combinations
+  const combinationCounts = {};
+  
+  Object.keys(errorsByLine).forEach(line => {
+    const guidelines = errorsByLine[line];
+    if (guidelines.length > 1) {
+      // Create a sorted, unique combination key
+      const uniqueGuidelines = [...new Set(guidelines)].sort(compareGuidelines);
+      const combinationKey = uniqueGuidelines.join(' + ');
+      
+      if (!combinationCounts[combinationKey]) {
+        combinationCounts[combinationKey] = 0;
+      }
+      combinationCounts[combinationKey]++;
+    }
+  });
+  
+  // Convert to array and sort by count (descending)
+  const combinations = Object.entries(combinationCounts)
+    .map(([combination, count]) => ({ combination, count }))
+    .sort((a, b) => b.count - a.count);
+  
+  // Update modal content
+  modalFileName.textContent = `Violation Combinations - ${location}`;
+  
+  if (combinations.length === 0) {
+    modalContent.innerHTML = '<p>No lines with multiple violations found in this file.</p>';
+  } else {
+    let html = '<table class="modal-table"><thead><tr><th>Violation Combination</th><th>Lines Count</th></tr></thead><tbody>';
+    combinations.forEach(({ combination, count }) => {
+      html += `<tr><td>${combination}</td><td>${count}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    modalContent.innerHTML = html;
+  }
+  
+  // Show modal
+  violationCombinationsModal.style.display = "block";
 }
