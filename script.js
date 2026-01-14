@@ -217,11 +217,11 @@ function toggleMultiselectItem(type, item) {
     selected.push(item);
   }
   
-  // Clear search input after selection
-  searchInput.value = '';
+  // Keep search input value so user can select multiple matching items
+  const currentSearch = searchInput.value.toLowerCase().trim();
   
   updateMultiselectChips(type);
-  updateMultiselectDropdown(type, '');
+  updateMultiselectDropdown(type, currentSearch);
   renderTable();
 }
 
