@@ -112,6 +112,18 @@ if (baselineFileInput) {
   baselineFileInput.addEventListener("change", loadBaselineXML);
 }
 
+// Comparison level slider
+const comparisonLevelSlider = document.getElementById("comparisonLevel");
+
+if (comparisonLevelSlider) {
+  comparisonLevelSlider.addEventListener("input", (e) => {
+    // Re-render comparison table with new level
+    if (baselineErrors.length > 0 && errors.length > 0) {
+      renderComparisonTable();
+    }
+  });
+}
+
 // Modal close handlers
 if (modalCloseBtn) {
   modalCloseBtn.addEventListener("click", () => {
@@ -381,7 +393,10 @@ function loadXML(event) {
   fileName.textContent = file.name;
   reloadBtn.style.display = "inline-block";
   const reader = new FileReader();
-  reader.onload = () => parseXML(reader.result);
+  reader.onload = () => {
+    resetCompareTab();
+    parseXML(reader.result);
+  };
   reader.readAsText(file);
 }
 
@@ -389,8 +404,26 @@ function reloadFile() {
   if (!currentFile) return;
   
   const reader = new FileReader();
-  reader.onload = () => parseXML(reader.result);
+  reader.onload = () => {
+    resetCompareTab();
+    parseXML(reader.result);
+  };
   reader.readAsText(currentFile);
+}
+
+function resetCompareTab() {
+  // Reset baseline data when reloading main XML
+  baselineXmlContent = null;
+  baselineErrors = [];
+  if (baselineFileName) {
+    baselineFileName.textContent = "";
+  }
+  if (baselineFileInput) {
+    baselineFileInput.value = "";
+  }
+  
+  // Clear comparison table immediately
+  renderComparisonTable();
 }
 
 function loadBaselineXML(event) {
@@ -1174,42 +1207,7 @@ function renderComparisonTable() {
   const movedErrors = [];
   const processedNew = new Set();
   const processedFixed = new Set();
-  
-  newErrors.forEach((newError, newIdx) => {
-    if (processedNew.has(newIdx)) return;
-    
-    fixedErrors.forEach((fixedError, fixedIdx) => {
-      if (processedFixed.has(fixedIdx)) return;
-      
-      // Check if they represent the same violation that moved
-      if (
-        newError.guideline === fixedError.guideline &&
-        newError.file === fixedError.file &&
-        newError.msg === fixedError.msg &&
-        newError.classification === fixedError.classification &&
-        (newError.line !== fixedError.line || newError.column !== fixedError.column)
-      ) {
-        // Create a moved entry
-        movedErrors.push({
-          ...newError,
-          status: 'moved',
-          oldLine: fixedError.line,
-          oldColumn: fixedError.column,
-          newLine: newError.line,
-          newColumn: newError.column
-        });
-        
-        processedNew.add(newIdx);
-        processedFixed.add(fixedIdx);
-      }
-    });
-  });
-  
-  // Filter out processed errors
-  const remainingNewErrors = newErrors.filter((_, idx) => !processedNew.has(idx));
-  const remainingFixedErrors = fixedErrors.filter((_, idx) => !processedFixed.has(idx));
-  
-  // Sort by file first, then line, then column, then guideline
+
   const sortComparison = (a, b) => {
     // First compare by file
     const fileComp = a.file.localeCompare(b.file);
@@ -1228,7 +1226,61 @@ function renderComparisonTable() {
     // Finally by guideline
     return compareGuidelines(a.guideline, b.guideline);
   };
+
+  newErrors.sort(sortComparison);
+  fixedErrors.sort(sortComparison);
+
+  for (const [newIdx, newError] of newErrors.entries()) {
+    if (processedNew.has(newIdx)) continue;
+    
+    for (const [fixedIdx, fixedError] of fixedErrors.entries()) {
+      if (processedFixed.has(fixedIdx)) continue;
+      
+      // Check if they represent the same violation that moved
+      // Get comparison level from slider (1=guideline, 2=guideline+file, 3=guideline+file+lines)
+      const comparisonLevel = parseInt(document.getElementById('comparisonLevel')?.value || '2', 10);
+      
+      let isSameError = false;
+      if (comparisonLevel === 1) {
+        // Compare by guideline only
+        isSameError = newError.guideline === fixedError.guideline;
+      } else if (comparisonLevel === 2) {
+        // Compare by guideline and file
+        isSameError = newError.guideline === fixedError.guideline &&
+                      newError.file === fixedError.file;
+      } else {
+        // Compare by guideline, file, and lines (default)
+        isSameError = newError.guideline === fixedError.guideline &&
+                      newError.file === fixedError.file &&
+                      ((newError.line === fixedError.line && newError.column !== fixedError.column) ||
+                       (newError.line !== fixedError.line && newError.column === fixedError.column));
+      }
+      
+      if (isSameError) {
+        // Create a moved entry
+        movedErrors.push({
+          ...newError,
+          status: 'moved',
+          oldLine: fixedError.line,
+          oldColumn: fixedError.column,
+          newLine: newError.line,
+          newColumn: newError.column
+        });
+        
+        processedNew.add(newIdx);
+        processedFixed.add(fixedIdx);
+
+        break;
+      }
+    }
+  }
   
+  // Filter out processed errors
+  const remainingNewErrors = newErrors.filter((_, idx) => !processedNew.has(idx));
+  const remainingFixedErrors = fixedErrors.filter((_, idx) => !processedFixed.has(idx));
+  
+  // Sort by file first, then line, then column, then guideline
+
   remainingNewErrors.sort(sortComparison);
   remainingFixedErrors.sort(sortComparison);
   movedErrors.sort(sortComparison);
@@ -1243,7 +1295,7 @@ function renderComparisonTable() {
   const statusLabelToValue = {
     'NEW': 'new',
     'FIXED': 'fixed',
-    'POTENTIALLY MOVED': 'moved'
+    'MOVED': 'moved'
   };
   
   const filteredChanges = allChanges.filter(error => {
@@ -1302,7 +1354,7 @@ function renderComparisonTable() {
           <span class="file-stats">
             ${newCount > 0 ? `<span class="status-badge status-new">${newCount} NEW</span>` : ''}
             ${fixedCount > 0 ? `<span class="status-badge status-fixed">${fixedCount} FIXED</span>` : ''}
-            ${movedCount > 0 ? `<span class="status-badge status-moved">${movedCount} POTENTIALLY MOVED</span>` : ''}
+            ${movedCount > 0 ? `<span class="status-badge status-moved">${movedCount} MOVED</span>` : ''}
           </span>
         </td>
       `;
@@ -1317,7 +1369,7 @@ function renderComparisonTable() {
           const columnDisplay = error.oldColumn === error.newColumn ? error.newColumn : `${error.oldColumn}-${error.newColumn}`;
           
           row.innerHTML = `
-            <td><span class="status-badge status-moved">POTENTIALLY MOVED</span></td>
+            <td><span class="status-badge status-moved">MOVED</span></td>
             <td>${error.guideline}
             <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${error.guideline}.html" target="_blank">C</a>
             <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${error.guideline}.html" target="_blank">C++</a>
@@ -1393,7 +1445,7 @@ function updateCompareFilterOptions(allChanges = []) {
   const files = [...new Set(allChanges.map(e => e.file))].sort();
   
   // Always include all 3 statuses regardless of what's in the data
-  allCompareStatus = ['NEW', 'FIXED', 'POTENTIALLY MOVED'];
+  allCompareStatus = ['NEW', 'FIXED', 'MOVED'];
   allCompareGuidelines = guidelines;
   allCompareFiles = files;
   
