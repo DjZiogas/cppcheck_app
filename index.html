@@ -13,25 +13,24 @@
 
 <h2>Cppcheck XML Viewer</h2>
 
-<div class="file-input-wrapper">
-  <input type="file" id="fileInput" accept=".xml" />
-  <label for="fileInput" class="file-input-label ripple">
-    Choose XML File
-  </label>
-  <button id="reloadBtn" class="reload-btn" style="display: none;">
-    ↻ Reload
-  </button>
-  <span class="file-name" id="fileName"></span>
-</div>
-
-<div class="card">
-  <div class="input-group">
-    <label for="workspaceRoot" title="Enter the root directory of your workspace. This allows you to click on file paths in the table to open them directly in VS Code.">Workspace Root</label>
-    <input
-      type="text"
-      id="workspaceRoot"
-      placeholder="e.g. C:/projects/myrepo"
-    />
+<div class="header">
+  <div class="file-input-wrapper">
+    <input type="file" id="fileInput" accept=".xml" />
+    <label for="fileInput" class="file-input-label ripple">
+      Choose XML File
+    </label>
+    <button id="reloadBtn" class="reload-btn" style="display: none;">
+      ↻ Reload
+    </button>
+    <span class="file-name" id="fileName"></span>
+  </div>
+  <div class="workspace-input-inline">
+      <label for="workspaceRoot" title="Enter the root directory of your workspace. This allows you to click on file paths in the table to open them directly in VS Code.">Workspace Root</label>
+      <input
+        type="text"
+        id="workspaceRoot"
+        placeholder="e.g. C:/projects/myrepo"
+      />
   </div>
 </div>
 
@@ -181,12 +180,31 @@
 <div id="compareTab" class="tab-content">
   <h3>Compare</h3>
   
-  <div class="file-input-wrapper">
-    <input type="file" id="baselineFileInput" accept=".xml" />
-    <label for="baselineFileInput" class="file-input-label ripple">
-      Load Baseline XML
-    </label>
-    <span class="file-name" id="baselineFileName"></span>
+  <div class="compare-controls-wrapper">
+    <div class="file-input-wrapper">
+      <input type="file" id="baselineFileInput" accept=".xml" />
+      <label for="baselineFileInput" class="file-input-label ripple">
+        Load Baseline XML
+      </label>
+      <span class="file-name" id="baselineFileName"></span>
+    </div>
+
+    <div class="comparison-level-container">
+      <label for="comparisonLevel">Comparison Level:</label>
+      <div class="slider-content-wrapper">
+        <div class="slider-wrapper">
+          <input type="range" id="comparisonLevel" min="1" max="3" value="2" step="1" />
+          <div class="slider-labels">
+            <span>Guideline</span>
+            <span>+ File</span>
+            <span>+ Lines</span>
+          </div>
+        </div>
+        <div class="slider-explanation">
+          Lines option: Matches errors where guideline, file, and line/column match, with only line OR only column differing
+        </div>
+      </div>
+    </div>
   </div>
 
 <div class="filters-section collapsed">
