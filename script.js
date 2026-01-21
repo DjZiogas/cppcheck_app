@@ -24,9 +24,29 @@ const violationCombinationsModal = document.getElementById("violationCombination
 const modalCloseBtn = document.getElementById("modalCloseBtn");
 const modalFileName = document.getElementById("modalFileName");
 const modalContent = document.getElementById("modalContent");
+const comparisonTableBody = document.getElementById("comparisonTableBody");
+const newErrorsCount = document.getElementById("newErrorsCount");
+const fixedErrorsCount = document.getElementById("fixedErrorsCount");
+const movedErrorsCount = document.getElementById("movedErrorsCount");
+const totalChangesCount = document.getElementById("totalChangesCount");
+const compareStatusFilterSearch = document.getElementById("compareStatusFilterSearch");
+const compareStatusFilterDropdown = document.getElementById("compareStatusFilterDropdown");
+const compareStatusSelectedChips = document.getElementById("compareStatusSelectedChips");
+const compareStatusFilterWrapper = document.getElementById("compareStatusFilterWrapper");
+const compareGuidelineFilterSearch = document.getElementById("compareGuidelineFilterSearch");
+const compareGuidelineFilterDropdown = document.getElementById("compareGuidelineFilterDropdown");
+const compareGuidelineSelectedChips = document.getElementById("compareGuidelineSelectedChips");
+const compareGuidelineFilterWrapper = document.getElementById("compareGuidelineFilterWrapper");
+const compareFileFilterSearch = document.getElementById("compareFileFilterSearch");
+const compareFileFilterDropdown = document.getElementById("compareFileFilterDropdown");
+const compareFileSelectedChips = document.getElementById("compareFileSelectedChips");
+const compareFileFilterWrapper = document.getElementById("compareFileFilterWrapper");
+const resetCompareFiltersBtn = document.getElementById("resetCompareFiltersBtn");
 const WORKSPACE_KEY = "cppcheckWorkspaceRoot";
 
 let errors = [];
+let baselineErrors = [];
+let baselineXmlContent = null;
 let currentFile = null;
 let allLocations = [];
 let filteredErrors = [];
@@ -47,6 +67,14 @@ let selectedLocations = [];
 let allGuidelines = [];
 let allLocationsForMultiselect = [];
 
+// Compare tab multiselect state
+let selectedCompareStatus = [];
+let selectedCompareGuidelines = [];
+let selectedCompareFiles = [];
+let allCompareStatus = [];
+let allCompareGuidelines = [];
+let allCompareFiles = [];
+
 workspaceInput.value = localStorage.getItem(WORKSPACE_KEY) || "";
 
 workspaceInput.addEventListener("input", () => {
@@ -59,8 +87,30 @@ fileInput.addEventListener("change", loadXML);
 initMultiselect('guideline', guidelineFilterSearch, guidelineFilterDropdown, guidelineSelectedChips, guidelineFilterWrapper);
 initMultiselect('location', locationFilterSearch, locationFilterDropdown, locationSelectedChips, locationFilterWrapper);
 
+// Initialize Compare tab multiselect components
+if (compareStatusFilterSearch && compareStatusFilterDropdown && compareStatusSelectedChips && compareStatusFilterWrapper) {
+  initMultiselect('compareStatus', compareStatusFilterSearch, compareStatusFilterDropdown, compareStatusSelectedChips, compareStatusFilterWrapper);
+}
+if (compareGuidelineFilterSearch && compareGuidelineFilterDropdown && compareGuidelineSelectedChips && compareGuidelineFilterWrapper) {
+  initMultiselect('compareGuideline', compareGuidelineFilterSearch, compareGuidelineFilterDropdown, compareGuidelineSelectedChips, compareGuidelineFilterWrapper);
+}
+if (compareFileFilterSearch && compareFileFilterDropdown && compareFileSelectedChips && compareFileFilterWrapper) {
+  initMultiselect('compareFile', compareFileFilterSearch, compareFileFilterDropdown, compareFileSelectedChips, compareFileFilterWrapper);
+}
+
 resetFiltersBtn.addEventListener("click", resetFilters);
+if (resetCompareFiltersBtn) {
+  resetCompareFiltersBtn.addEventListener("click", resetCompareFilters);
+}
 reloadBtn.addEventListener("click", reloadFile);
+
+// Baseline file loading
+const baselineFileInput = document.getElementById("baselineFileInput");
+const baselineFileName = document.getElementById("baselineFileName");
+
+if (baselineFileInput) {
+  baselineFileInput.addEventListener("change", loadBaselineXML);
+}
 
 // Modal close handlers
 if (modalCloseBtn) {
@@ -160,9 +210,29 @@ function initMultiselect(type, searchInput, dropdown, chipsContainer, wrapper) {
 }
 
 function updateMultiselectDropdown(type, searchQuery = '') {
-  const items = type === 'guideline' ? allGuidelines : allLocationsForMultiselect;
-  const selected = type === 'guideline' ? selectedGuidelines : selectedLocations;
-  const dropdown = type === 'guideline' ? guidelineFilterDropdown : locationFilterDropdown;
+  let items, selected, dropdown;
+  
+  if (type === 'guideline') {
+    items = allGuidelines;
+    selected = selectedGuidelines;
+    dropdown = guidelineFilterDropdown;
+  } else if (type === 'location') {
+    items = allLocationsForMultiselect;
+    selected = selectedLocations;
+    dropdown = locationFilterDropdown;
+  } else if (type === 'compareStatus') {
+    items = allCompareStatus;
+    selected = selectedCompareStatus;
+    dropdown = compareStatusFilterDropdown;
+  } else if (type === 'compareGuideline') {
+    items = allCompareGuidelines;
+    selected = selectedCompareGuidelines;
+    dropdown = compareGuidelineFilterDropdown;
+  } else if (type === 'compareFile') {
+    items = allCompareFiles;
+    selected = selectedCompareFiles;
+    dropdown = compareFileFilterDropdown;
+  }
   
   dropdown.innerHTML = '';
   
@@ -179,7 +249,7 @@ function updateMultiselectDropdown(type, searchQuery = '') {
     filtered.forEach(item => {
       const option = document.createElement('div');
       option.className = 'multiselect-option';
-      
+
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.id = `${type}-${item}`;
@@ -192,7 +262,8 @@ function updateMultiselectDropdown(type, searchQuery = '') {
       label.className = 'multiselect-option-label';
       label.htmlFor = `${type}-${item}`;
       label.textContent = item;
-      label.addEventListener('click', (e) => {
+      
+      option.addEventListener('click', (e) => {
         e.preventDefault();
         checkbox.checked = !checkbox.checked;
         checkbox.dispatchEvent(new Event('change'));
@@ -206,9 +277,29 @@ function updateMultiselectDropdown(type, searchQuery = '') {
 }
 
 function toggleMultiselectItem(type, item) {
-  const selected = type === 'guideline' ? selectedGuidelines : selectedLocations;
-  const chipsContainer = type === 'guideline' ? guidelineSelectedChips : locationSelectedChips;
-  const searchInput = type === 'guideline' ? guidelineFilterSearch : locationFilterSearch;
+  let selected, chipsContainer, searchInput;
+  
+  if (type === 'guideline') {
+    selected = selectedGuidelines;
+    chipsContainer = guidelineSelectedChips;
+    searchInput = guidelineFilterSearch;
+  } else if (type === 'location') {
+    selected = selectedLocations;
+    chipsContainer = locationSelectedChips;
+    searchInput = locationFilterSearch;
+  } else if (type === 'compareStatus') {
+    selected = selectedCompareStatus;
+    chipsContainer = compareStatusSelectedChips;
+    searchInput = compareStatusFilterSearch;
+  } else if (type === 'compareGuideline') {
+    selected = selectedCompareGuidelines;
+    chipsContainer = compareGuidelineSelectedChips;
+    searchInput = compareGuidelineFilterSearch;
+  } else if (type === 'compareFile') {
+    selected = selectedCompareFiles;
+    chipsContainer = compareFileSelectedChips;
+    searchInput = compareFileFilterSearch;
+  }
   
   const index = selected.indexOf(item);
   if (index > -1) {
@@ -222,12 +313,39 @@ function toggleMultiselectItem(type, item) {
   
   updateMultiselectChips(type);
   updateMultiselectDropdown(type, currentSearch);
-  renderTable();
+  
+  // Update the appropriate table
+  if (type === 'guideline' || type === 'location') {
+    renderTable();
+  } else if (type === 'compareStatus' || type === 'compareGuideline' || type === 'compareFile') {
+    renderComparisonTable();
+  }
 }
 
 function updateMultiselectChips(type) {
-  const selected = type === 'guideline' ? selectedGuidelines : selectedLocations;
-  const chipsContainer = type === 'guideline' ? guidelineSelectedChips : locationSelectedChips;
+  let selected, chipsContainer, searchInput;
+  
+  if (type === 'guideline') {
+    selected = selectedGuidelines;
+    chipsContainer = guidelineSelectedChips;
+    searchInput = guidelineFilterSearch;
+  } else if (type === 'location') {
+    selected = selectedLocations;
+    chipsContainer = locationSelectedChips;
+    searchInput = locationFilterSearch;
+  } else if (type === 'compareStatus') {
+    selected = selectedCompareStatus;
+    chipsContainer = compareStatusSelectedChips;
+    searchInput = compareStatusFilterSearch;
+  } else if (type === 'compareGuideline') {
+    selected = selectedCompareGuidelines;
+    chipsContainer = compareGuidelineSelectedChips;
+    searchInput = compareGuidelineFilterSearch;
+  } else if (type === 'compareFile') {
+    selected = selectedCompareFiles;
+    chipsContainer = compareFileSelectedChips;
+    searchInput = compareFileFilterSearch;
+  }
   
   chipsContainer.innerHTML = '';
   
@@ -248,7 +366,6 @@ function updateMultiselectChips(type) {
   });
   
   // Update dropdown checkboxes
-  const searchInput = type === 'guideline' ? guidelineFilterSearch : locationFilterSearch;
   updateMultiselectDropdown(type, searchInput.value.toLowerCase().trim());
 }
 
@@ -274,6 +391,54 @@ function reloadFile() {
   const reader = new FileReader();
   reader.onload = () => parseXML(reader.result);
   reader.readAsText(currentFile);
+}
+
+function loadBaselineXML(event) {
+  const file = event.target.files[0];
+  if (!file) {
+    baselineFileName.textContent = "";
+    baselineXmlContent = null;
+    baselineErrors = [];
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    baselineXmlContent = reader.result;
+    baselineFileName.textContent = file.name;
+    parseBaselineXML(baselineXmlContent);
+  };
+  reader.readAsText(file);
+}
+
+function parseBaselineXML(xmlText) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlText, "application/xml");
+
+  baselineErrors = Array.from(xml.getElementsByTagName("error"))
+    .filter(err =>
+      err.hasAttribute("guideline") &&
+      err.hasAttribute("classification")
+    )
+    .map(err => {
+      const location = err.getElementsByTagName("location")[0];
+
+      return {
+        guideline: err.getAttribute("guideline"),
+        classification: err.getAttribute("classification"),
+        msg: err.getAttribute("msg"),
+        file: location?.getAttribute("file") || "",
+        line: location?.getAttribute("line") || "",
+        column: location?.getAttribute("column") || ""
+      };
+    });
+
+  console.log(`Baseline XML loaded: ${baselineErrors.length} errors`);
+  
+  // Render comparison if we have current errors
+  if (errors.length > 0) {
+    renderComparisonTable();
+  }
 }
 
 function parseXML(xmlText) {
@@ -303,6 +468,12 @@ function parseXML(xmlText) {
     });
 
   populateFilters();
+  
+  // Show Compare tab now that XML is loaded
+  const compareTabBtn = document.querySelector('.compare-tab-btn');
+  if (compareTabBtn) {
+    compareTabBtn.style.display = 'inline-block';
+  }
   
   // Restore filter values if they still exist in the new data
   selectedGuidelines = savedGuidelines.filter(g => allGuidelines.includes(g));
@@ -564,6 +735,31 @@ function resetFilters() {
   renderTable();
 }
 
+function resetCompareFilters() {
+  selectedCompareStatus = ['NEW', 'FIXED'];
+  selectedCompareGuidelines = [];
+  selectedCompareFiles = [];
+  
+  // Restore all options
+  updateCompareFilterOptions();
+  
+  // Clear search inputs
+  if (compareStatusFilterSearch) compareStatusFilterSearch.value = "";
+  if (compareGuidelineFilterSearch) compareGuidelineFilterSearch.value = "";
+  if (compareFileFilterSearch) compareFileFilterSearch.value = "";
+  
+  // Update chips and dropdowns
+  updateMultiselectChips('compareStatus');
+  updateMultiselectChips('compareGuideline');
+  updateMultiselectChips('compareFile');
+  updateMultiselectDropdown('compareStatus', '');
+  updateMultiselectDropdown('compareGuideline', '');
+  updateMultiselectDropdown('compareFile', '');
+  
+  // Re-render the comparison table with no filters applied
+  renderComparisonTable();
+}
+
 function switchTab(tabName) {
   // Update tab buttons
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -585,6 +781,8 @@ function switchTab(tabName) {
     document.getElementById('summaryTab').classList.add('active');
   } else if (tabName === 'byLocation') {
     document.getElementById('byLocationTab').classList.add('active');
+  } else if (tabName === 'compare') {
+    document.getElementById('compareTab').classList.add('active');
   }
 }
 
@@ -915,4 +1113,318 @@ function showViolationCombinationsModal(location) {
   
   // Show modal
   violationCombinationsModal.style.display = "block";
+}
+
+// Comparison functions
+function createErrorKey(error) {
+  // Create a unique key for each error based on guideline, file, line, and column
+  return `${error.guideline}|${error.file}|${error.line}|${error.column}`;
+}
+
+function renderComparisonTable() {
+  if (!comparisonTableBody) return;
+  
+  // Clear the table
+  comparisonTableBody.innerHTML = '';
+  
+  // If no baseline loaded, show message
+  if (baselineErrors.length === 0) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="7" style="text-align: center; padding: 20px;">Load a baseline XML file to compare changes.</td>';
+    comparisonTableBody.appendChild(row);
+    
+    // Reset statistics
+    if (newErrorsCount) newErrorsCount.textContent = '0';
+    if (fixedErrorsCount) fixedErrorsCount.textContent = '0';
+    if (movedErrorsCount) movedErrorsCount.textContent = '0';
+    if (totalChangesCount) totalChangesCount.textContent = '0';
+    return;
+  }
+  
+  // Create sets for efficient comparison
+  const baselineSet = new Map();
+  baselineErrors.forEach(error => {
+    const key = createErrorKey(error);
+    baselineSet.set(key, error);
+  });
+  
+  const currentSet = new Map();
+  errors.forEach(error => {
+    const key = createErrorKey(error);
+    currentSet.set(key, error);
+  });
+  
+  // Find new errors (in current but not in baseline)
+  const newErrors = [];
+  currentSet.forEach((error, key) => {
+    if (!baselineSet.has(key)) {
+      newErrors.push({ ...error, status: 'new' });
+    }
+  });
+  
+  // Find fixed errors (in baseline but not in current)
+  const fixedErrors = [];
+  baselineSet.forEach((error, key) => {
+    if (!currentSet.has(key)) {
+      fixedErrors.push({ ...error, status: 'fixed' });
+    }
+  });
+  
+  // Detect moved errors (same guideline, file, msg, classification but different line/column)
+  const movedErrors = [];
+  const processedNew = new Set();
+  const processedFixed = new Set();
+  
+  newErrors.forEach((newError, newIdx) => {
+    if (processedNew.has(newIdx)) return;
+    
+    fixedErrors.forEach((fixedError, fixedIdx) => {
+      if (processedFixed.has(fixedIdx)) return;
+      
+      // Check if they represent the same violation that moved
+      if (
+        newError.guideline === fixedError.guideline &&
+        newError.file === fixedError.file &&
+        newError.msg === fixedError.msg &&
+        newError.classification === fixedError.classification &&
+        (newError.line !== fixedError.line || newError.column !== fixedError.column)
+      ) {
+        // Create a moved entry
+        movedErrors.push({
+          ...newError,
+          status: 'moved',
+          oldLine: fixedError.line,
+          oldColumn: fixedError.column,
+          newLine: newError.line,
+          newColumn: newError.column
+        });
+        
+        processedNew.add(newIdx);
+        processedFixed.add(fixedIdx);
+      }
+    });
+  });
+  
+  // Filter out processed errors
+  const remainingNewErrors = newErrors.filter((_, idx) => !processedNew.has(idx));
+  const remainingFixedErrors = fixedErrors.filter((_, idx) => !processedFixed.has(idx));
+  
+  // Sort by file first, then line, then column, then guideline
+  const sortComparison = (a, b) => {
+    // First compare by file
+    const fileComp = a.file.localeCompare(b.file);
+    if (fileComp !== 0) return fileComp;
+    
+    // Then by line (ensure numeric comparison)
+    const lineA = parseInt(a.newLine || a.line, 10) || 0;
+    const lineB = parseInt(b.newLine || b.line, 10) || 0;
+    if (lineA !== lineB) return lineA - lineB;
+    
+    // Then by column (ensure numeric comparison)
+    const colA = parseInt(a.newColumn || a.column, 10) || 0;
+    const colB = parseInt(b.newColumn || b.column, 10) || 0;
+    if (colA !== colB) return colA - colB;
+    
+    // Finally by guideline
+    return compareGuidelines(a.guideline, b.guideline);
+  };
+  
+  remainingNewErrors.sort(sortComparison);
+  remainingFixedErrors.sort(sortComparison);
+  movedErrors.sort(sortComparison);
+  
+  // Combine changes - sort each file's errors by line
+  let allChanges = [...remainingNewErrors, ...remainingFixedErrors, ...movedErrors].sort(sortComparison);
+  
+  // Update filter options before filtering
+  updateCompareFilterOptions(allChanges);
+  
+  // Apply filters - map display labels back to internal status values
+  const statusLabelToValue = {
+    'NEW': 'new',
+    'FIXED': 'fixed',
+    'POTENTIALLY MOVED': 'moved'
+  };
+  
+  const filteredChanges = allChanges.filter(error => {
+    // Map selected status labels to internal values for comparison
+    const selectedStatusValues = selectedCompareStatus.map(label => statusLabelToValue[label] || label);
+    const statusMatch = selectedCompareStatus.length === 0 || selectedStatusValues.includes(error.status);
+    const guidelineMatch = selectedCompareGuidelines.length === 0 || selectedCompareGuidelines.includes(error.guideline);
+    const fileMatch = selectedCompareFiles.length === 0 || selectedCompareFiles.includes(error.file);
+    return statusMatch && guidelineMatch && fileMatch;
+  });
+  
+  // Update statistics based on filtered results
+  const filteredNewCount = filteredChanges.filter(e => e.status === 'new').length;
+  const filteredFixedCount = filteredChanges.filter(e => e.status === 'fixed').length;
+  const filteredMovedCount = filteredChanges.filter(e => e.status === 'moved').length;
+  
+  if (newErrorsCount) newErrorsCount.textContent = filteredNewCount;
+  if (fixedErrorsCount) fixedErrorsCount.textContent = filteredFixedCount;
+  if (movedErrorsCount) movedErrorsCount.textContent = filteredMovedCount;
+  if (totalChangesCount) totalChangesCount.textContent = filteredChanges.length;
+  
+  // Render rows grouped by file
+  if (filteredChanges.length === 0) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="7" style="text-align: center; padding: 20px;">No changes detected between baseline and current XML.</td>';
+    comparisonTableBody.appendChild(row);
+  } else {
+    // Group changes by file
+    const changesByFile = {};
+    filteredChanges.forEach(error => {
+      if (!changesByFile[error.file]) {
+        changesByFile[error.file] = [];
+      }
+      changesByFile[error.file].push(error);
+    });
+    
+    // Get sorted file list
+    const sortedFiles = Object.keys(changesByFile).sort();
+    
+    // Render each file group
+    sortedFiles.forEach(file => {
+      const fileErrors = changesByFile[file];
+      const newCount = fileErrors.filter(e => e.status === 'new').length;
+      const fixedCount = fileErrors.filter(e => e.status === 'fixed').length;
+      const movedCount = fileErrors.filter(e => e.status === 'moved').length;
+      
+      // Add file header row
+      const headerRow = document.createElement('tr');
+      headerRow.className = 'file-group-header';
+      const fileLink = vscodeLink(file);
+      headerRow.innerHTML = `
+        <td colspan="7">
+          <strong>
+            ${fileLink ? `<a href="${fileLink}">${file}</a>` : file}
+          </strong>
+          <span class="file-stats">
+            ${newCount > 0 ? `<span class="status-badge status-new">${newCount} NEW</span>` : ''}
+            ${fixedCount > 0 ? `<span class="status-badge status-fixed">${fixedCount} FIXED</span>` : ''}
+            ${movedCount > 0 ? `<span class="status-badge status-moved">${movedCount} POTENTIALLY MOVED</span>` : ''}
+          </span>
+        </td>
+      `;
+      comparisonTableBody.appendChild(headerRow);
+      
+      // Add error rows for this file
+      fileErrors.forEach(error => {
+        const row = document.createElement('tr');
+        
+        if (error.status === 'moved') {
+          const lineDisplay = error.oldLine === error.newLine ? error.newLine : `${error.oldLine}-${error.newLine}`;
+          const columnDisplay = error.oldColumn === error.newColumn ? error.newColumn : `${error.oldColumn}-${error.newColumn}`;
+          
+          row.innerHTML = `
+            <td><span class="status-badge status-moved">POTENTIALLY MOVED</span></td>
+            <td>${error.guideline}
+            <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${error.guideline}.html" target="_blank">C</a>
+            <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${error.guideline}.html" target="_blank">C++</a>
+            </td>
+            <td>${error.classification}</td>
+            <td>${error.msg}</td>
+            <td>
+              ${
+                vscodeLink(error.file, error.newLine, error.newColumn)
+                  ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${error.file}</a>`
+                  : error.file
+              }
+            </td>
+            <td>
+              ${
+                vscodeLink(error.file, error.newLine, error.newColumn)
+                  ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${lineDisplay}</a>`
+                  : lineDisplay
+              }
+            </td>
+            <td>
+              ${
+                vscodeLink(error.file, error.newLine, error.newColumn)
+                  ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${columnDisplay}</a>`
+                  : columnDisplay
+              }
+            </td>
+          `;
+        } else {
+          const statusClass = error.status === 'new' ? 'status-new' : 'status-fixed';
+          const statusText = error.status === 'new' ? 'NEW' : 'FIXED';
+          
+          row.innerHTML = `
+            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+            <td>${error.guideline}
+            <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${error.guideline}.html" target="_blank">C</a>
+            <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${error.guideline}.html" target="_blank">C++</a>
+            </td>
+            <td>${error.classification}</td>
+            <td>${error.msg}</td>
+            <td>
+              ${
+                vscodeLink(error.file, error.line, error.column)
+                  ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.file}</a>`
+                  : error.file
+              }
+            </td>
+            <td>
+              ${
+                vscodeLink(error.file, error.line, error.column)
+                  ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.line}</a>`
+                  : error.line
+              }
+            </td>
+            <td>
+              ${
+                vscodeLink(error.file, error.line, error.column)
+                  ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.column}</a>`
+                  : error.column
+              }
+            </td>
+          `;
+        }
+        comparisonTableBody.appendChild(row);
+      });
+    });
+  }
+}
+
+function updateCompareFilterOptions(allChanges = []) {
+  // Extract unique values for each filter
+  const guidelines = [...new Set(allChanges.map(e => e.guideline))].sort(compareGuidelines);
+  const files = [...new Set(allChanges.map(e => e.file))].sort();
+  
+  // Always include all 3 statuses regardless of what's in the data
+  allCompareStatus = ['NEW', 'FIXED', 'POTENTIALLY MOVED'];
+  allCompareGuidelines = guidelines;
+  allCompareFiles = files;
+  
+  // Initialize selectedCompareStatus with 'NEW' and 'FIXED' if not already set
+  if (selectedCompareStatus.length === 0) {
+    selectedCompareStatus = ['NEW', 'FIXED'];
+  }
+  
+  // Update dropdowns with current search queries
+  if (compareStatusFilterSearch && compareStatusFilterDropdown) {
+    updateMultiselectDropdown('compareStatus', compareStatusFilterSearch.value.toLowerCase().trim());
+  }
+  if (compareGuidelineFilterSearch && compareGuidelineFilterDropdown) {
+    updateMultiselectDropdown('compareGuideline', compareGuidelineFilterSearch.value.toLowerCase().trim());
+  }
+  if (compareFileFilterSearch && compareFileFilterDropdown) {
+    updateMultiselectDropdown('compareFile', compareFileFilterSearch.value.toLowerCase().trim());
+  }
+  
+  // Remove selections that are no longer available
+  selectedCompareStatus = selectedCompareStatus.filter(s => allCompareStatus.includes(s));
+  selectedCompareGuidelines = selectedCompareGuidelines.filter(g => allCompareGuidelines.includes(g));
+  selectedCompareFiles = selectedCompareFiles.filter(f => allCompareFiles.includes(f));
+  
+  // Update chips
+  updateMultiselectChips('compareStatus');
+  updateMultiselectChips('compareGuideline');
+  updateMultiselectChips('compareFile');
+}
+
+// Toggle filters section collapse/expand
+function toggleFilters(filtersSection) {
+  filtersSection.classList.toggle('collapsed');
 }

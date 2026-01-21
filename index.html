@@ -39,11 +39,16 @@
   <button class="tab-btn active" data-tab="errors">Errors</button>
   <button class="tab-btn" data-tab="summary">Summary</button>
   <button class="tab-btn" data-tab="byLocation">By Location</button>
+  <button class="tab-btn compare-tab-btn" data-tab="compare" style="display: none;">Compare</button>
 </div>
 
 <div id="errorsTab" class="tab-content active">
-<div class="filters-section">
-  <h3>Filters</h3>
+<div class="filters-section collapsed">
+  <div class="filters-header" onclick="toggleFilters(this.parentElement)">
+    <h3>Filters</h3>
+    <span class="collapse-icon">▼</span>
+  </div>
+  <div class="filters-content">
   <div class="filters-row">
     <div class="filter-item">
       <label for="guidelineFilter">Guideline</label>
@@ -80,6 +85,7 @@
     </div>
   </div>
   <button id="resetFiltersBtn" class="reset-filters-btn">Reset Filters</button>
+  </div>
 </div>
 
 <div id="statsSection">
@@ -170,6 +176,119 @@
     <tbody id="locationSummaryTableBody"></tbody>
   </table>
 </div>
+</div>
+
+<div id="compareTab" class="tab-content">
+  <h3>Compare</h3>
+  
+  <div class="file-input-wrapper">
+    <input type="file" id="baselineFileInput" accept=".xml" />
+    <label for="baselineFileInput" class="file-input-label ripple">
+      Load Baseline XML
+    </label>
+    <span class="file-name" id="baselineFileName"></span>
+  </div>
+
+<div class="filters-section collapsed">
+  <div class="filters-header" onclick="toggleFilters(this.parentElement)">
+    <h3>Filters</h3>
+    <span class="collapse-icon">▼</span>
+  </div>
+  <div class="filters-content">
+  <div class="filters-row">
+    <div class="filter-item">
+      <label for="compareStatusFilter">Status</label>
+      <div class="multiselect-wrapper" id="compareStatusFilterWrapper">
+        <div class="multiselect-input-container">
+          <div class="multiselect-selected-chips" id="compareStatusSelectedChips"></div>
+          <input
+            type="text"
+            id="compareStatusFilterSearch"
+            class="multiselect-search"
+            placeholder="Search status..."
+            autocomplete="off"
+          />
+        </div>
+        <div class="multiselect-dropdown" id="compareStatusFilterDropdown"></div>
+      </div>
+    </div>
+
+    <div class="filter-item">
+      <label for="compareGuidelineFilter">Guideline</label>
+      <div class="multiselect-wrapper" id="compareGuidelineFilterWrapper">
+        <div class="multiselect-input-container">
+          <div class="multiselect-selected-chips" id="compareGuidelineSelectedChips"></div>
+          <input
+            type="text"
+            id="compareGuidelineFilterSearch"
+            class="multiselect-search"
+            placeholder="Search guidelines..."
+            autocomplete="off"
+          />
+        </div>
+        <div class="multiselect-dropdown" id="compareGuidelineFilterDropdown"></div>
+      </div>
+    </div>
+
+    <div class="filter-item">
+      <label for="compareFileFilter">File</label>
+      <div class="multiselect-wrapper" id="compareFileFilterWrapper">
+        <div class="multiselect-input-container">
+          <div class="multiselect-selected-chips" id="compareFileSelectedChips"></div>
+          <input
+            type="text"
+            id="compareFileFilterSearch"
+            class="multiselect-search"
+            placeholder="Search files..."
+            autocomplete="off"
+          />
+        </div>
+        <div class="multiselect-dropdown" id="compareFileFilterDropdown"></div>
+      </div>
+    </div>
+  </div>
+  <button id="resetCompareFiltersBtn" class="reset-filters-btn">Reset Filters</button>
+  </div>
+</div>
+  
+  <div id="comparisonStatsSection">
+    <h3>Comparison Statistics</h3>
+    <div class="stats-container">
+      <div class="stat-item">
+        <span class="stat-label">New Errors</span>
+        <span class="stat-value" id="newErrorsCount">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Fixed Errors</span>
+        <span class="stat-value" id="fixedErrorsCount">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Potentially Moved</span>
+        <span class="stat-value" id="movedErrorsCount">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Total Changes</span>
+        <span class="stat-value" id="totalChangesCount">0</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Guideline</th>
+          <th>Classification</th>
+          <th>Message</th>
+          <th>File</th>
+          <th>Line</th>
+          <th>Col</th>
+        </tr>
+      </thead>
+      <tbody id="comparisonTableBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Violation Combinations Modal -->
