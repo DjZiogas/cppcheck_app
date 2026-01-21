@@ -55,6 +55,13 @@ const BATCH_SIZE = 50;
 let isLoading = false;
 let observer = null;
 let sortColumn = null;
+
+// Comparison table lazy rendering state
+let filteredComparisonChanges = [];
+let comparisonCurrentIndex = 0;
+const COMPARISON_BATCH_SIZE = 50;
+let comparisonIsLoading = false;
+let comparisonObserver = null;
 let sortDirection = 'asc';
 let summarySortColumn = null;
 let summarySortDirection = 'asc';
@@ -713,6 +720,156 @@ function addSentinel() {
   }
 }
 
+function setupComparisonLazyLoading() {
+  comparisonObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const sentinel = entry.target;
+        comparisonObserver.unobserve(sentinel);
+        sentinel.remove();
+        loadMoreComparisonRows();
+      }
+    });
+  }, {
+    root: null,
+    rootMargin: '200px',
+    threshold: 0.1
+  });
+}
+
+function addComparisonSentinel() {
+  const sentinel = document.createElement('tr');
+  sentinel.className = 'sentinel-row';
+  sentinel.innerHTML = '<td colspan="7" style="text-align:center;padding:20px;">Loading more...</td>';
+  comparisonTableBody.appendChild(sentinel);
+  
+  if (comparisonObserver) {
+    comparisonObserver.observe(sentinel);
+  }
+}
+
+function loadMoreComparisonRows() {
+  if (comparisonIsLoading || comparisonCurrentIndex >= filteredComparisonChanges.length) return;
+
+  comparisonIsLoading = true;
+  const endIndex = Math.min(comparisonCurrentIndex + COMPARISON_BATCH_SIZE, filteredComparisonChanges.length);
+  
+  for (let i = comparisonCurrentIndex; i < endIndex; i++) {
+    const item = filteredComparisonChanges[i];
+    
+    // Render file header if this is the first item of a new file group
+    if (i === 0 || filteredComparisonChanges[i - 1].file !== item.file) {
+      const file = item.file;
+      // Count errors in this file group
+      const fileErrors = filteredComparisonChanges.filter(e => e.file === file);
+      const newCount = fileErrors.filter(e => e.status === 'new').length;
+      const fixedCount = fileErrors.filter(e => e.status === 'fixed').length;
+      const movedCount = fileErrors.filter(e => e.status === 'moved').length;
+      
+      // Add file header row
+      const headerRow = document.createElement('tr');
+      headerRow.className = 'file-group-header';
+      const fileLink = vscodeLink(file);
+      headerRow.innerHTML = `
+        <td colspan="7">
+          <strong>
+            ${fileLink ? `<a href="${fileLink}">${file}</a>` : file}
+          </strong>
+          <span class="file-stats">
+            ${newCount > 0 ? `<span class="status-badge status-new">${newCount} NEW</span>` : ''}
+            ${fixedCount > 0 ? `<span class="status-badge status-fixed">${fixedCount} FIXED</span>` : ''}
+            ${movedCount > 0 ? `<span class="status-badge status-moved">${movedCount} MOVED</span>` : ''}
+          </span>
+        </td>
+      `;
+      comparisonTableBody.appendChild(headerRow);
+    }
+    
+    // Render error row
+    const error = item;
+    const row = document.createElement('tr');
+    
+    if (error.status === 'moved') {
+      const lineDisplay = error.oldLine === error.newLine ? error.newLine : `${error.oldLine}-${error.newLine}`;
+      const columnDisplay = error.oldColumn === error.newColumn ? error.newColumn : `${error.oldColumn}-${error.newColumn}`;
+      
+      row.innerHTML = `
+        <td><span class="status-badge status-moved">MOVED</span></td>
+        <td>${error.guideline}
+        <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${error.guideline}.html" target="_blank">C</a>
+        <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${error.guideline}.html" target="_blank">C++</a>
+        </td>
+        <td>${error.classification}</td>
+        <td>${error.msg}</td>
+        <td>
+          ${
+            vscodeLink(error.file, error.newLine, error.newColumn)
+              ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${error.file}</a>`
+              : error.file
+          }
+        </td>
+        <td>
+          ${
+            vscodeLink(error.file, error.newLine, error.newColumn)
+              ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${lineDisplay}</a>`
+              : lineDisplay
+          }
+        </td>
+        <td>
+          ${
+            vscodeLink(error.file, error.newLine, error.newColumn)
+              ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${columnDisplay}</a>`
+              : columnDisplay
+          }
+        </td>
+      `;
+    } else {
+      const statusClass = error.status === 'new' ? 'status-new' : 'status-fixed';
+      const statusText = error.status === 'new' ? 'NEW' : 'FIXED';
+      
+      row.innerHTML = `
+        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+        <td>${error.guideline}
+        <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${error.guideline}.html" target="_blank">C</a>
+        <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${error.guideline}.html" target="_blank">C++</a>
+        </td>
+        <td>${error.classification}</td>
+        <td>${error.msg}</td>
+        <td>
+          ${
+            vscodeLink(error.file, error.line, error.column)
+              ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.file}</a>`
+              : error.file
+          }
+        </td>
+        <td>
+          ${
+            vscodeLink(error.file, error.line, error.column)
+              ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.line}</a>`
+              : error.line
+          }
+        </td>
+        <td>
+          ${
+            vscodeLink(error.file, error.line, error.column)
+              ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.column}</a>`
+              : error.column
+          }
+        </td>
+      `;
+    }
+    comparisonTableBody.appendChild(row);
+  }
+
+  comparisonCurrentIndex = endIndex;
+  comparisonIsLoading = false;
+
+  // If there are more rows, add sentinel
+  if (comparisonCurrentIndex < filteredComparisonChanges.length) {
+    addComparisonSentinel();
+  }
+}
+
 function compareGuidelines(a, b) {
   const aParts = a.split('.').map(Number);
   const bParts = b.split('.').map(Number);
@@ -1160,6 +1317,11 @@ function renderComparisonTable() {
   // Clear the table
   comparisonTableBody.innerHTML = '';
   
+  // Disconnect previous observer
+  if (comparisonObserver) {
+    comparisonObserver.disconnect();
+  }
+  
   // If no baseline loaded, show message
   if (baselineErrors.length === 0) {
     const row = document.createElement('tr');
@@ -1317,125 +1479,23 @@ function renderComparisonTable() {
   if (movedErrorsCount) movedErrorsCount.textContent = filteredMovedCount;
   if (totalChangesCount) totalChangesCount.textContent = filteredChanges.length;
   
-  // Render rows grouped by file
+  // Store filtered changes for lazy loading
+  filteredComparisonChanges = filteredChanges;
+  
+  // Reset index
+  comparisonCurrentIndex = 0;
+  
+  // Render rows grouped by file with lazy loading
   if (filteredChanges.length === 0) {
     const row = document.createElement('tr');
     row.innerHTML = '<td colspan="7" style="text-align: center; padding: 20px;">No changes detected between baseline and current XML.</td>';
     comparisonTableBody.appendChild(row);
   } else {
-    // Group changes by file
-    const changesByFile = {};
-    filteredChanges.forEach(error => {
-      if (!changesByFile[error.file]) {
-        changesByFile[error.file] = [];
-      }
-      changesByFile[error.file].push(error);
-    });
+    // Setup intersection observer for lazy loading BEFORE loading rows
+    setupComparisonLazyLoading();
     
-    // Get sorted file list
-    const sortedFiles = Object.keys(changesByFile).sort();
-    
-    // Render each file group
-    sortedFiles.forEach(file => {
-      const fileErrors = changesByFile[file];
-      const newCount = fileErrors.filter(e => e.status === 'new').length;
-      const fixedCount = fileErrors.filter(e => e.status === 'fixed').length;
-      const movedCount = fileErrors.filter(e => e.status === 'moved').length;
-      
-      // Add file header row
-      const headerRow = document.createElement('tr');
-      headerRow.className = 'file-group-header';
-      const fileLink = vscodeLink(file);
-      headerRow.innerHTML = `
-        <td colspan="7">
-          <strong>
-            ${fileLink ? `<a href="${fileLink}">${file}</a>` : file}
-          </strong>
-          <span class="file-stats">
-            ${newCount > 0 ? `<span class="status-badge status-new">${newCount} NEW</span>` : ''}
-            ${fixedCount > 0 ? `<span class="status-badge status-fixed">${fixedCount} FIXED</span>` : ''}
-            ${movedCount > 0 ? `<span class="status-badge status-moved">${movedCount} MOVED</span>` : ''}
-          </span>
-        </td>
-      `;
-      comparisonTableBody.appendChild(headerRow);
-      
-      // Add error rows for this file
-      fileErrors.forEach(error => {
-        const row = document.createElement('tr');
-        
-        if (error.status === 'moved') {
-          const lineDisplay = error.oldLine === error.newLine ? error.newLine : `${error.oldLine}-${error.newLine}`;
-          const columnDisplay = error.oldColumn === error.newColumn ? error.newColumn : `${error.oldColumn}-${error.newColumn}`;
-          
-          row.innerHTML = `
-            <td><span class="status-badge status-moved">MOVED</span></td>
-            <td>${error.guideline}
-            <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${error.guideline}.html" target="_blank">C</a>
-            <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${error.guideline}.html" target="_blank">C++</a>
-            </td>
-            <td>${error.classification}</td>
-            <td>${error.msg}</td>
-            <td>
-              ${
-                vscodeLink(error.file, error.newLine, error.newColumn)
-                  ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${error.file}</a>`
-                  : error.file
-              }
-            </td>
-            <td>
-              ${
-                vscodeLink(error.file, error.newLine, error.newColumn)
-                  ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${lineDisplay}</a>`
-                  : lineDisplay
-              }
-            </td>
-            <td>
-              ${
-                vscodeLink(error.file, error.newLine, error.newColumn)
-                  ? `<a href="${vscodeLink(error.file, error.newLine, error.newColumn)}">${columnDisplay}</a>`
-                  : columnDisplay
-              }
-            </td>
-          `;
-        } else {
-          const statusClass = error.status === 'new' ? 'status-new' : 'status-fixed';
-          const statusText = error.status === 'new' ? 'NEW' : 'FIXED';
-          
-          row.innerHTML = `
-            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-            <td>${error.guideline}
-            <a href="https://www.mathworks.com/help/bugfinder/ref/misrac2023rule${error.guideline}.html" target="_blank">C</a>
-            <a href="https://www.mathworks.com/help/bugfinder/ref/misracpp2023rule${error.guideline}.html" target="_blank">C++</a>
-            </td>
-            <td>${error.classification}</td>
-            <td>${error.msg}</td>
-            <td>
-              ${
-                vscodeLink(error.file, error.line, error.column)
-                  ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.file}</a>`
-                  : error.file
-              }
-            </td>
-            <td>
-              ${
-                vscodeLink(error.file, error.line, error.column)
-                  ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.line}</a>`
-                  : error.line
-              }
-            </td>
-            <td>
-              ${
-                vscodeLink(error.file, error.line, error.column)
-                  ? `<a href="${vscodeLink(error.file, error.line, error.column)}">${error.column}</a>`
-                  : error.column
-              }
-            </td>
-          `;
-        }
-        comparisonTableBody.appendChild(row);
-      });
-    });
+    // Load initial batch
+    loadMoreComparisonRows();
   }
 }
 
